@@ -67,16 +67,3 @@ const Laundry = mongoose.model("Laundry", laundrySchema);
 export default Laundry;
 
 
-
-// items: [
-//   {
-//     category: "wash+fold",
-//     name: "Shirt",
-//     price: 40
-//   },
-//   {
-//     category: "wash+iron",
-//     name: "Trousers",
-//     price: 60
-//   }
-//  ]

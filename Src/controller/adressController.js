@@ -50,3 +50,24 @@ export const selectAddress = async (req, res) => {
     res.status(500).json({ message: "Server error", error: err.message });
   }
 };
+
+
+export const deleteAddress = async (req, res) => {
+  const { addressId } = req.body;
+  const userId = req.user.id;
+
+  try {
+    // remove the matching subdocument from the array
+    await USER.findByIdAndUpdate(
+      userId,
+      { $pull: { addresses: { _id: addressId } } },
+      { new: true }
+    );
+
+    res.status(200).json({ message: "Address deleted" });
+  } catch (err) {
+    res
+      .status(500)
+      .json({ message: "Error while deleting address", error: err.message });
+  }
+};

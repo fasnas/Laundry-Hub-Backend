@@ -6,37 +6,6 @@ import Laundry from "../model/laundrySchema.js";
 
 
 
-// export const register = async (req, res) => {
-//   try {
-//     const { name, email, password, authType, role, googleId } = req.body;
-//     console.log(password);
-//     const existUser = await USER.findOne({ email });
-
-//     if (existUser) {
-//       return res.status(400).json({ message: "User already exists" });
-//     }
-
-//     const hashedpassword = await hashpassword(password);
-//     const newUser = new USER({
-//       name,
-//       email,
-//       role,
-//       authType,
-//       googleId: authType === "google" ? googleId : null,
-//       password: authType === "google" ? "" : hashedpassword,
-//     });
-
-//     await newUser.save();
-//     const token = generatetoken(newUser);
-//     res
-//       .status(201)
-//       .json({ message: "User registered successfully", user: newUser ,token});
-//   } catch (error) {
-//     console.error("Registration error:", error);
-//     res.status(500).json({ message: "Server error during registration" });
-//   }
-// };
-//////////////////////////////////////////////////////////////////////////////////////////////
 import OTP from "../model/otpSchema.js";
 import { sendOTPEmail } from "../utils/sendOtp.js";
 // import { LaundryItem } from "../model/cartSchema.js";
@@ -63,44 +32,43 @@ export const sendOTP = async (req, res) => {
     // Send OTP email
     await sendOTPEmail(email, otp);
 
-    res.status(200).json({ message: "OTP sent to email",otp });
+    res.status(200).json({ message: "OTP sent to email", otp });
   } catch (error) {
     console.error("Error sending OTP:", error);
     res.status(500).json({ message: "Error sending OTP" });
   }
 };
-/////////////////////////////////////////////////////////////////////////////////////////////////
 
+///////////////this verify otp for forget password/////////
 
+export const verifyOTP = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
 
-// export const verifyOTP = async (req, res) => {
-//   try {
-//     const { email, otp } = req.body;
+    if (!email || !otp) {
+      return res.status(400).json({ message: "Email and OTP are required" });
+    }
 
-//     if (!email || !otp) {
-//       return res.status(400).json({ message: "Email and OTP are required" });
-//     }
+    // Find OTP entry
+    const otpRecord = await OTP.findOne({ email });
 
-//     // Find OTP entry
-//     const otpRecord = await OTP.findOne({ email });
+    if (!otpRecord) {
+      return res.status(400).json({ message: "OTP expired or not found" });
+    }
 
-//     if (!otpRecord) {
-//       return res.status(400).json({ message: "OTP expired or not found" });
-//     }
+    if (otpRecord.otp !== parseInt(otp)) {
+      return res.status(400).json({ message: "Invalid OTP" });
+    }
 
-//     if (otpRecord.otp !== parseInt(otp)) {
-//       return res.status(400).json({ message: "Invalid OTP" });
-//     }
+    // OTP is valid
+    await OTP.deleteMany({ email }); // Optional: cleanup
 
-//     // OTP is valid
-//     await OTP.deleteMany({ email }); // Optional: cleanup
-
-//     res.status(200).json({ message: "OTP verified successfully" });
-//   } catch (error) {
-//     console.error("OTP verification error:", error);
-//     res.status(500).json({ message: "Server error during OTP verification" });
-//   }
-// };
+    res.status(200).json({ message: "OTP verified successfully" });
+  } catch (error) {
+    console.error("OTP verification error:", error);
+    res.status(500).json({ message: "Server error during OTP verification" });
+  }
+};
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -201,14 +169,14 @@ export const register = async (req, res) => {
     if (existUser) {
       return res.status(400).json({ message: "User already exists" });
     }
-    
+
     const existlaundry = await Laundry.findOne({ email });
     if (existlaundry) {
       return res.status(400).json({ message: " already exists" });
     }
-    
+
     // OTP Verification step
-    const otpRecord = await OTP.findOne({otp});
+    const otpRecord = await OTP.findOne({ otp });
     console.log(otpRecord)
     if (!otpRecord) {
       return res.status(400).json({ message: "OTP expired or not found" });
@@ -250,14 +218,35 @@ export const register = async (req, res) => {
 };
 
 
+export const forgotpassword=async(req,res)=>{
+
+  try {
+     const { email,newpassword} = req.body;
+     console.log(newpassword,email,"front")
+     const user=await USER.findOne({email})
+     if(!user){
+      return res.status(404).json({message:"user not found"})
+     }
+     if(user){
+      user.password=await hashpassword(newpassword)
+      await  user.save()
+      return res.status(200).json({message:"password changed succussfully"})
+     }
+    
+  } catch (error) {
+    return res.status(500).json({message:"error happen while changing password"})
+  }
+}
+
+
 export const updateUserLocation = async (req, res) => {
   try {
-    const userId = req.user.id; 
+    const userId = req.user.id;
     console.log(req.user)
     console.log(userId)
     const { latitude, longitude, locationName } = req.body;
 
-    if (!latitude || !longitude ) {
+    if (!latitude || !longitude) {
       return res.status(400).json({ message: "All fields are required" });
     }
 
@@ -286,5 +275,4 @@ export const updateUserLocation = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
-
 

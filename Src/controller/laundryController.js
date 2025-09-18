@@ -1,11 +1,13 @@
 import Laundry from "../model/laundrySchema.js";
+import Order from "../model/orderSchema.js";
 import USER from "../model/userModel.js";
 import { hashpassword } from "../utils/bcypt.js";
+import mongoose from "mongoose";
 
 
 export const registerLaundry = async (req, res) => {
   try {
-    const { name, email, password,  location } = req.body;
+    const { name, email, password, location } = req.body;
 
     // Validation
     if (!name || !email || !password || !location?.coordinates) {
@@ -22,14 +24,14 @@ export const registerLaundry = async (req, res) => {
     if (existinguser) {
       return res.status(409).json({ message: " email already exists." });
     }
-    
-    const hashedpassword= await hashpassword(password)
+
+    const hashedpassword = await hashpassword(password)
 
     // Create laundry document
     const newLaundry = new Laundry({
       name,
       email,
-      password:hashedpassword,
+      password: hashedpassword,
       location,
     });
 
@@ -39,26 +41,6 @@ export const registerLaundry = async (req, res) => {
   } catch (error) {
     console.error("Register error:", error);
     return res.status(500).json({ message: "Server error." });
-  }
-};
-
-
-
-export const GetAllLaundry = async (req, res) => {
-  try {
-    const laundries = await Laundry.find();
-
-    res.status(200).json({
-      success: true,
-      count: laundries.length,
-      laundries,
-    });
-  } catch (error) {
-    console.error("Error fetching laundries:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch laundries",
-    });
   }
 };
 
@@ -134,18 +116,34 @@ export const getLaundriesWithin50km = async (req, res) => {
 };
 
 
+
+//below controllers are for admin side operations
+
 export const updateLaundryItems = async (req, res) => {
   const { items } = req.body;
   const id = req.user.id;
-  console.log(req.user)
 
   try {
     const laundry = await Laundry.findById(id);
-    if (!laundry) {
-      return res.status(404).json({ message: "Laundry not found" });
+    if (!laundry) return res.status(404).json({ message: "Laundry not found" });
+
+    // ✅ Check for duplicates
+    const alreadyExists = items.some(newItem =>
+      laundry.items.some(
+        oldItem =>
+          oldItem.category.toLocaleLowerCase() === newItem.category.toLocaleLowerCase() &&
+          oldItem.name.toLocaleLowerCase() === newItem.name.toLocaleLowerCase()
+      )
+    );
+
+    if (alreadyExists) {
+      return res.status(400).json({
+        message: "One or more items already exist with same category and name"
+      });
     }
 
-    laundry.items = laundry.items.concat(items); 
+    // ✅ Add and save
+    laundry.items.push(...items);
     await laundry.save();
 
     res.status(200).json({
@@ -153,15 +151,45 @@ export const updateLaundryItems = async (req, res) => {
       items: laundry.items,
     });
   } catch (err) {
-    console.error("Error updating laundry items:", err);
+    console.error(err);
     res.status(500).json({ message: "Internal server error" });
   }
 };
 
+//delete laundry items
+
+export const deleteitem = async (req, res) => {
+  const { deleteid } = req.body;     // subdocument _id
+  const userId = req.user.id;        // parent Laundry document id
+
+  try {
+    // remove the item whose _id matches deleteid from the items array
+    const updatedLaundry = await Laundry.findByIdAndUpdate(
+      userId,
+      { $pull: { items: { _id: deleteid } } },
+      { new: true }                  // return the updated document
+    );
+
+    if (!updatedLaundry) {
+      return res.status(404).json({ message: "Laundry not found" });
+    }
+
+    res.status(200).json({
+      message: "Item deleted successfully",
+      data: updatedLaundry.items,    // send back remaining items if you like
+    });
+  } catch (error) {
+    // console.error("Error deleting product:", error);
+    res.status(500).json({ message: "Error while deleting product" });
+  }
+};
+
+
+//for getting laundry items
 
 export const getLaundryItems = async (req, res) => {
-  const id = req.user.id; 
-  console.log(id)
+  const id = req.user.id;
+  // console.log(id)
   try {
     const laundry = await Laundry.findById(id);
     if (!laundry) {
@@ -173,7 +201,70 @@ export const getLaundryItems = async (req, res) => {
       items: laundry.items,
     });
   } catch (err) {
-    console.error("Error fetching laundry items:", err);
+    // console.error("Error fetching laundry items:", err);
     res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+
+//for getting laundrywise orders
+
+export const getLaundryOrders = async (req, res) => {
+  const id = req.user.id
+  // console.log(id)
+  try {
+    const orders = await Order.find({ laundry: id })
+    if (!orders) {
+      return res.status(404).json({ message: "There's no orders" });
+    }
+
+    res.status(200).json({
+      message: "orders fetched succussfully",
+      items: orders
+    });
+
+
+  } catch (error) {
+    res.status(400).json({
+      message: "error hapene"
+    });
+  }
+}
+
+
+
+// 
+
+
+export const statusupdate = async (req, res) => {
+  const { orderid, status } = req.body;
+  console.log(typeof(orderid),typeof(status))
+
+  try {
+    if (!mongoose.Types.ObjectId.isValid(orderid)) {
+      return res.status(400).json({ message: "Invalid order id" });
+    }
+    if (!status) {
+      return res.status(400).json({ message: "Status is required" });
+    }
+
+    const order = await Order.findById(orderid);
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    order.status = status;
+    await order.save();
+
+    res.status(200).json({
+      message: "Status updated successfully",
+      order,
+    });
+  } catch (error) {
+    console.error("Status update error:", error);
+    res.status(500).json({
+      message: "Error happened while status updation",
+      error: error.message,
+    });
   }
 };

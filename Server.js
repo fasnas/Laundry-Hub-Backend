@@ -8,6 +8,7 @@ import laundryRouter from "./Src/routes/laundryRoutes.js";
 import userRouter from "./Src/routes/userRoutes.js";
 import cartRouter from "./Src/routes/cartroute.js";
 import addressRouter from "./Src/routes/adressRoute.js";
+import PaymentRouter from "./Src/routes/paymentRouter.js";
 
 
 const app = express();
@@ -27,6 +28,7 @@ app.use("/api",laundryRouter)
 app.use("/api",userRouter)
 app.use("/api",cartRouter)
 app.use("/api",addressRouter)
+app.use("/api",PaymentRouter)
 
 app.listen(PORT, () => {
   console.log("server working succesfully");
